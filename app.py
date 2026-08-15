@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Palette tokens injected cleanly into standard Streamlit containers
+# Dark corporate palette styling architecture layout frames
 CUSTOM_CSS = """
 <style>
 @import url('https://googleapis.com');
@@ -167,7 +167,7 @@ def try_reconnect_existing_index() -> None:
 try_reconnect_existing_index()
 
 # --------------------------------------------------------------------------
-# Sidebar UI Layout
+# Sidebar UI Components
 # --------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 📑 Document Intelligence")
@@ -197,7 +197,7 @@ with st.sidebar:
             st.session_state.vectorstore = vectorstore
             st.session_state.rag_chain = chain
             st.session_state.ingestion_stats = stats
-            st.session_state.kpi_results = None  # Reset KPIs to trigger refetch
+            st.session_state.kpi_results = None  
             st.success(f"Indexed in {elapsed:.1f}s")
         except FileNotFoundError:
             st.error("No file found. Upload a PDF first.")
