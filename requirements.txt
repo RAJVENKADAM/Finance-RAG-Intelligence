@@ -1,0 +1,23 @@
+# Core orchestration
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-groq>=0.2.0
+langchain-huggingface>=0.1.0
+langchain-chroma>=0.1.4
+
+# Vector store
+chromadb>=0.5.0
+
+# Local embeddings backend
+sentence-transformers>=3.0.0
+
+# PDF parsing
+pypdf>=4.2.0
+
+# UI
+streamlit>=1.38.0
+
+# Environment / config
+python-dotenv>=1.0.1
