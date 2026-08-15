@@ -10,7 +10,7 @@ Chroma vector store using local HuggingFace embeddings.
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
@@ -99,8 +99,8 @@ def get_embedding_function() -> HuggingFaceEmbeddings:
 def build_vectorstore(chunks: List[Document]) -> Chroma:
     """
     Embed chunks and persist them into a local Chroma vector store.
-    A fresh collection is created (overwriting any prior run) so the
-    index always reflects the current source document.
+    Clears out any prior collection first so re-ingestion doesn't
+    duplicate chunks.
 
     Args:
         chunks: Chunked Document objects to embed and store.
@@ -110,17 +110,18 @@ def build_vectorstore(chunks: List[Document]) -> Chroma:
     """
     embeddings = get_embedding_function()
 
-    vectorstore = Chroma(
-        collection_name=COLLECTION_NAME,
-        embedding_function=embeddings,
-        persist_directory=CHROMA_PERSIST_DIR,
-    )
-    # Reset any previous collection so re-ingestion doesn't duplicate chunks.
+    # Safely clear any previous collection instance on disk
     try:
-        vectorstore.delete_collection()
+        temp_store = Chroma(
+            collection_name=COLLECTION_NAME,
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PERSIST_DIR,
+        )
+        temp_store.delete_collection()
     except Exception:
         pass
 
+    # Build fresh vectorstore from documents
     vectorstore = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
@@ -144,7 +145,7 @@ def load_existing_vectorstore() -> Chroma:
     )
 
 
-def ingest_pdf(pdf_path: str) -> tuple[Chroma, IngestionStats]:
+def ingest_pdf(pdf_path: str) -> Tuple[Chroma, IngestionStats]:
     """
     End-to-end ingestion orchestration: load -> split -> embed -> persist.
 
