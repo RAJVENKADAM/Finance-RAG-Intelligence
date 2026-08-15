@@ -4,18 +4,18 @@ ingestion.py
 PDF ingestion pipeline: load -> split -> embed -> persist.
 
 Responsible for turning `financial_report.pdf` into a persistent
-Chroma vector store using local HuggingFace embeddings.
+Chroma vector store using cloud Groq embeddings.
 """
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_groq import GroqEmbeddings
 from langchain_chroma import Chroma
 
 from config import (
@@ -24,6 +24,7 @@ from config import (
     CHROMA_PERSIST_DIR,
     COLLECTION_NAME,
     EMBEDDING_MODEL_NAME,
+    GROQ_API_KEY,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,18 +41,7 @@ class IngestionStats:
 
 
 def load_pdf(pdf_path: str) -> List[Document]:
-    """
-    Load a PDF file into LangChain Document objects (one per page).
-
-    Args:
-        pdf_path: Absolute or relative path to the PDF file.
-
-    Returns:
-        A list of Document objects with page-level content and metadata.
-
-    Raises:
-        FileNotFoundError: If the PDF does not exist at the given path.
-    """
+    """Load a PDF file into LangChain Document objects (one per page)."""
     if not Path(pdf_path).exists():
         raise FileNotFoundError(f"PDF not found at: {pdf_path}")
 
@@ -63,17 +53,7 @@ def load_pdf(pdf_path: str) -> List[Document]:
 
 
 def split_documents(documents: List[Document]) -> List[Document]:
-    """
-    Split raw page-level documents into overlapping chunks suitable
-    for embedding and retrieval.
-
-    Args:
-        documents: Page-level Document objects from the PDF loader.
-
-    Returns:
-        A list of chunked Document objects, preserving source metadata
-        (e.g. page number) for citation in the UI.
-    """
+    """Split raw page-level documents into overlapping chunks."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
@@ -84,44 +64,29 @@ def split_documents(documents: List[Document]) -> List[Document]:
     return chunks
 
 
-def get_embedding_function() -> HuggingFaceEmbeddings:
-    """
-    Instantiate the local, free sentence-transformer embedding model.
-    Runs on CPU by default so no external API key is required.
-    """
-    return HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL_NAME,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},
+def get_embedding_function() -> GroqEmbeddings:
+    """Instantiate the cloud Groq embedding model."""
+    return GroqEmbeddings(
+        api_key=GROQ_API_KEY,
+        model=EMBEDDING_MODEL_NAME,
     )
 
 
 def build_vectorstore(chunks: List[Document]) -> Chroma:
-    """
-    Embed chunks and persist them into a local Chroma vector store.
-    Clears out any prior collection first so re-ingestion doesn't
-    duplicate chunks.
-
-    Args:
-        chunks: Chunked Document objects to embed and store.
-
-    Returns:
-        A persistent Chroma vector store instance.
-    """
+    """Embed chunks and persist them into a local Chroma vector store."""
     embeddings = get_embedding_function()
 
-    # Safely clear any previous collection instance on disk
+    vectorstore = Chroma(
+        collection_name=COLLECTION_NAME,
+        embedding_function=embeddings,
+        persist_directory=CHROMA_PERSIST_DIR,
+    )
+    
     try:
-        temp_store = Chroma(
-            collection_name=COLLECTION_NAME,
-            embedding_function=embeddings,
-            persist_directory=CHROMA_PERSIST_DIR,
-        )
-        temp_store.delete_collection()
+        vectorstore.delete_collection()
     except Exception:
         pass
 
-    # Build fresh vectorstore from documents
     vectorstore = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
@@ -133,10 +98,7 @@ def build_vectorstore(chunks: List[Document]) -> Chroma:
 
 
 def load_existing_vectorstore() -> Chroma:
-    """
-    Reconnect to an already-persisted Chroma collection without
-    re-embedding the source PDF. Used on app restarts.
-    """
+    """Reconnect to an already-persisted Chroma collection."""
     embeddings = get_embedding_function()
     return Chroma(
         collection_name=COLLECTION_NAME,
@@ -145,16 +107,8 @@ def load_existing_vectorstore() -> Chroma:
     )
 
 
-def ingest_pdf(pdf_path: str) -> Tuple[Chroma, IngestionStats]:
-    """
-    End-to-end ingestion orchestration: load -> split -> embed -> persist.
-
-    Args:
-        pdf_path: Path to the source financial report PDF.
-
-    Returns:
-        Tuple of (vectorstore, IngestionStats) for use by the UI layer.
-    """
+def ingest_pdf(pdf_path: str) -> tuple[Chroma, IngestionStats]:
+    """End-to-end ingestion orchestration loop."""
     pages = load_pdf(pdf_path)
     chunks = split_documents(pages)
     vectorstore = build_vectorstore(chunks)
