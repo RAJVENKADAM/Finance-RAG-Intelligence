@@ -4,7 +4,7 @@ ingestion.py
 PDF ingestion pipeline: load -> split -> embed -> persist.
 
 Responsible for turning `financial_report.pdf` into a persistent
-Chroma vector store using cloud Groq embeddings.
+Chroma vector store using Serverless Cloud Inference Embeddings.
 """
 
 import logging
@@ -15,7 +15,7 @@ from typing import List
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_groq import GroqEmbeddings
+from langchain_community.embeddings import HuggingFaceInferenceEmbeddings
 from langchain_chroma import Chroma
 
 from config import (
@@ -64,11 +64,11 @@ def split_documents(documents: List[Document]) -> List[Document]:
     return chunks
 
 
-def get_embedding_function() -> GroqEmbeddings:
-    """Instantiate the cloud Groq embedding model."""
-    return GroqEmbeddings(
+def get_embedding_function() -> HuggingFaceInferenceEmbeddings:
+    """Instantiate the Serverless HuggingFace Cloud Inference model."""
+    return HuggingFaceInferenceEmbeddings(
         api_key=GROQ_API_KEY,
-        model=EMBEDDING_MODEL_NAME,
+        model_name=EMBEDDING_MODEL_NAME,
     )
 
 
