@@ -1,3 +1,6 @@
+# CPU-only PyTorch index for lightweight deployment
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Core orchestration
 langchain>=0.3.0
 langchain-core>=0.3.0
@@ -10,7 +13,8 @@ langchain-chroma>=0.1.4
 # Vector store
 chromadb>=0.5.0
 
-# Local embeddings backend
+# Local embeddings backend (will use CPU torch)
+torch
 sentence-transformers>=3.0.0
 
 # PDF parsing
