@@ -1,10 +1,7 @@
 """
 app.py
 ------
-Streamlit dashboard for the Finance RAG application.
-Designed with a clean, branded AI interface.
-
-Run with: streamlit run app.py
+Premium Streamlit dashboard for the Finance RAG application.
 """
 
 import logging
@@ -18,193 +15,134 @@ from ingestion import ingest_pdf, load_existing_vectorstore, IngestionStats
 from rag_pipeline import build_rag_chain, query_rag_chain
 from kpi_extractor import extract_kpis
 
-import logging
-import time
-from pathlib import Path
+logging.basicConfig(level=logging.INFO)
 
-import streamlit as st
-
-# MUST BE THE FIRST STREAMLIT COMMAND:
 st.set_page_config(
-    page_title="Finance RAG | Intelligence Dashboard",
-    page_icon="https://api.iconify.design/lucide:cat.svg",  # SVG link from below
+    page_title="Ledger | Financial Report Intelligence",
+    page_icon="📑",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --------------------------------------------------------------------------
-# Clean, Modern AI Design Tokens & Styling
-# --------------------------------------------------------------------------
-GEMINI_CSS = """
+# Palette tokens injected cleanly into standard Streamlit containers
+CUSTOM_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://googleapis.com');
 
 :root {
-    --bg-main: #0E1117;
-    --bg-surface: #1E2028;
-    --bg-surface-variant: #282A36;
-    --text-primary: #E3E2E6;
-    --text-secondary: #9B9EAB;
-    --border-subtle: #2E323D;
-    --accent-blue: #A8C7FA;
-    --font-stack: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --bg-primary: #0B0E14;
+    --bg-panel: #12161F;
+    --bg-panel-raised: #171C27;
+    --border-hairline: #232935;
+    --text-primary: #E8EAED;
+    --text-secondary: #8B93A3;
+    --accent-brass: #C9A15A;
+    --accent-mint: #4FD1AE;
 }
 
-html, body, [class*="css"] {
-    font-family: var(--font-stack);
-    background-color: var(--bg-main);
-    color: var(--text-primary);
+html, body, [class*="css"]  {
+    font-family: 'Inter', sans-serif;
 }
-
-#MainMenu, footer, header { visibility: hidden; }
 
 .stApp {
-    background-color: var(--bg-main);
+    background: radial-gradient(circle at 15% 0%, rgba(201, 161, 90, 0.05), transparent 40%), var(--bg-primary);
 }
 
-/* Sidebar styling */
-section[data-testid="stSidebar"] {
-    background-color: #13151C;
-    border-right: 1px solid var(--border-subtle);
+.ledger-masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-hairline);
+    padding-bottom: 14px;
+    margin-bottom: 28px;
 }
-
-section[data-testid="stSidebar"] h3 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+.ledger-masthead h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.9rem;
     color: var(--text-primary);
+    margin: 0;
 }
-
-/* Masthead Header */
-.ai-header {
-    margin-bottom: 32px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border-subtle);
-}
-.ai-header .tag {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-secondary);
+.ledger-masthead .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    color: var(--accent-brass);
 }
-.ai-header h1 {
-    font-size: 1.75rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin: 4px 0 0 0;
-    letter-spacing: -0.01em;
-}
-
-/* Section Labels */
-.section-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin: 24px 0 12px 0;
+.ledger-masthead .status-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent-mint);
+    border: 1px solid var(--border-hairline);
+    padding: 4px 12px;
+    border-radius: 999px;
 }
 
-/* KPI Cards */
 .kpi-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 16px 20px;
-    height: 100%;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hairline);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 15px;
 }
 .kpi-card .kpi-label {
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
     color: var(--text-secondary);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 .kpi-card .kpi-value {
-    font-size: 1.1rem;
+    font-family: 'Space Grotesk', sans-serif;
     font-weight: 600;
+    font-size: 1.05rem;
     color: var(--text-primary);
 }
 
-/* Input Fields & Form */
-div[data-testid="stTextInput"] input {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    border-radius: 24px;
-    padding: 14px 20px;
-    font-size: 0.95rem;
-}
-div[data-testid="stTextInput"] input:focus {
-    border-color: var(--accent-blue);
-    box-shadow: none;
+.section-heading {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--accent-brass);
+    margin: 30px 0 10px 0;
 }
 
-div[data-testid="stForm"] {
-    border: none;
-    padding: 0;
-}
-
-.stButton > button {
-    background-color: var(--bg-surface-variant);
-    color: var(--text-primary);
-    font-weight: 500;
-    font-size: 0.9rem;
-    border-radius: 20px;
-    border: 1px solid var(--border-subtle);
-    padding: 10px 24px;
-    transition: all 0.2s ease;
-}
-.stButton > button:hover {
-    background-color: var(--accent-blue);
-    color: #0E1117;
-    border-color: var(--accent-blue);
-}
-
-/* AI Answer Panel */
-.answer-box {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    padding: 20px 24px;
-    font-size: 0.95rem;
-    line-height: 1.6;
+.answer-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hairline);
+    border-left: 3px solid var(--accent-mint);
+    border-radius: 10px;
+    padding: 22px;
     color: var(--text-primary);
 }
 
-/* Citation / Source Cards */
-.source-box {
-    background: var(--bg-surface-variant);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 8px;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: var(--text-secondary);
+.source-card {
+    background: var(--bg-panel-raised);
+    border: 1px solid var(--border-hairline);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    color: var(--text-primary);
 }
-.source-box .source-meta {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent-blue);
-    margin-bottom: 4px;
-    display: block;
+.source-card .source-tag {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-brass);
+    font-size: 0.7rem;
+    margin-bottom: 6px;
 }
 </style>
 """
-st.markdown(GEMINI_CSS, unsafe_allow_html=True)
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
-# --------------------------------------------------------------------------
-# Session State Initialization
-# --------------------------------------------------------------------------
 def init_session_state() -> None:
     defaults = {
         "vectorstore": None,
         "rag_chain": None,
         "ingestion_stats": None,
         "kpi_results": None,
-        "query_history": [],
         "last_result": None,
     }
     for key, value in defaults.items():
@@ -220,39 +158,37 @@ def try_reconnect_existing_index() -> None:
         return
     try:
         vectorstore = load_existing_vectorstore()
-        if vectorstore._collection.count() > 0:  # noqa: SLF001
-            st.session_state.vectorstore = vectorstore
-            st.session_state.rag_chain = build_rag_chain(vectorstore)
+        st.session_state.vectorstore = vectorstore
+        st.session_state.rag_chain = build_rag_chain(vectorstore)
     except Exception:
         pass
 
 
 try_reconnect_existing_index()
 
-
 # --------------------------------------------------------------------------
-# Sidebar: Controls & Status
+# Sidebar UI Layout
 # --------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### Document Indexing")
-    st.caption("Chroma vector store pipeline")
+    st.markdown("### 📑 Document Intelligence")
+    st.caption("Cloud-optimized vector ingestion engine")
     st.divider()
 
     uploaded_file = st.file_uploader(
-        "Upload report PDF", type=["pdf"], label_visibility="collapsed"
+        "Upload financial report (PDF)", type=["pdf"], label_visibility="collapsed"
     )
 
     target_path = str(PDF_PATH)
     if uploaded_file is not None:
         Path(PDF_PATH).write_bytes(uploaded_file.getbuffer())
-        st.success(f"File loaded: {uploaded_file.name}")
+        st.success(f"Received: {uploaded_file.name}")
 
-    ingest_clicked = st.button("Run Ingestion", use_container_width=True)
+    ingest_clicked = st.button("⚙️  Run Ingestion Pipeline", use_container_width=True)
 
     if ingest_clicked:
         try:
             validate_config()
-            with st.spinner("Processing and indexing document..."):
+            with st.spinner("Loading PDF → Chunking → Cloud Vector Indexing..."):
                 start = time.time()
                 vectorstore, stats = ingest_pdf(target_path)
                 chain = build_rag_chain(vectorstore)
@@ -261,138 +197,94 @@ with st.sidebar:
             st.session_state.vectorstore = vectorstore
             st.session_state.rag_chain = chain
             st.session_state.ingestion_stats = stats
-            st.session_state.kpi_results = None
-            st.success(f"Completed in {elapsed:.1f}s")
+            st.session_state.kpi_results = None  # Reset KPIs to trigger refetch
+            st.success(f"Indexed in {elapsed:.1f}s")
         except FileNotFoundError:
-            st.error("Document missing. Upload a file or place 'financial_report.pdf' in /data.")
-        except EnvironmentError as e:
-            st.error(str(e))
-        except Exception as e:  # noqa: BLE001
+            st.error("No file found. Upload a PDF first.")
+        except Exception as e:
             st.error(f"Ingestion failed: {e}")
 
     st.divider()
 
-    stats: IngestionStats | None = st.session_state.ingestion_stats
+    stats: IngestionStats = st.session_state.ingestion_stats
     if stats:
-        st.markdown("**Index Information**")
-        st.markdown(
-            f"""
-            <div style="font-size:0.8rem; color:#9B9EAB; line-height:1.8;">
-            Source: <span style="color:#E3E2E6">{stats.source_file}</span><br>
-            Pages: <span style="color:#E3E2E6">{stats.total_pages}</span><br>
-            Chunks: <span style="color:#E3E2E6">{stats.total_chunks}</span><br>
-            Embeddings: <span style="color:#E3E2E6">{stats.embedding_model}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown("**📂 Index Metadata**")
+        st.caption(f"Chunks created: `{stats.total_chunks}`")
+        st.caption(f"Source file: `{stats.source_file}`")
     else:
-        st.info("No active document index.")
-
-    st.divider()
-    st.markdown("**System Metadata**")
-    st.caption("Model: llama-3.1-8b-instant")
-    st.caption("Context Top-K: 4")
-    st.caption("Chunk Config: 1000 / 200")
-
+        st.caption("No vector index active.")
 
 # --------------------------------------------------------------------------
-# Main Masthead
+# Main Panel View
 # --------------------------------------------------------------------------
 st.markdown(
     """
-    <div class="ai-header">
-        <div class="tag">Financial Intelligence System</div>
-        <h1>Report Analysis & Insights</h1>
+    <div class="ledger-masthead">
+        <div>
+            <div class="eyebrow">Enterprise Risk RAG Engine</div>
+            <h1>Ledger</h1>
+        </div>
+        <div class="status-pill">● SECURE CLOUD ACTIVE</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# --------------------------------------------------------------------------
-# Headline Metrics Row
-# --------------------------------------------------------------------------
-st.markdown('<div class="section-label">Key Metrics</div>', unsafe_allow_html=True)
+# Extract metric highlights early if vector store is ready
+if st.session_state.rag_chain and not st.session_state.kpi_results:
+    with st.spinner("Extracting headline KPIs..."):
+        st.session_state.kpi_results = extract_kpis(st.session_state.rag_chain)
 
-if st.session_state.rag_chain is None:
-    st.markdown(
-        '<div class="source-box">Index a document from the sidebar to extract financial metrics.</div>',
-        unsafe_allow_html=True,
-    )
-else:
-    if st.session_state.kpi_results is None:
-        with st.spinner("Extracting headline metrics..."):
-            st.session_state.kpi_results = extract_kpis(st.session_state.rag_chain)
-
-    kpi_cols = st.columns(len(st.session_state.kpi_results))
-    for col, kpi in zip(kpi_cols, st.session_state.kpi_results):
+# Render Metric Grid
+if st.session_state.kpi_results:
+    cols = st.columns(len(st.session_state.kpi_results))
+    for col, (label, val) in zip(cols, st.session_state.kpi_results.items()):
         with col:
             st.markdown(
                 f"""
                 <div class="kpi-card">
-                    <div class="kpi-label">{kpi.label}</div>
-                    <div class="kpi-value">{kpi.value}</div>
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{val}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-# --------------------------------------------------------------------------
-# Query Interface
-# --------------------------------------------------------------------------
-st.markdown('<div class="section-label">Query Model</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-heading">Financial Question Routing Panel</div>', unsafe_allow_html=True)
 
 with st.form(key="query_form", clear_on_submit=False):
-    query_col, button_col = st.columns([5, 1])
-    with query_col:
-        user_question = st.text_input(
-            "Query Input",
-            placeholder="Ask a question about the document...",
-            label_visibility="collapsed",
-        )
-    with button_col:
-        submitted = st.form_submit_button("Submit", use_container_width=True)
+    query_text = st.text_input("Enter analyst prompt", placeholder="What are the structural risks outlined in Section 4?")
+    submit_query = st.form_submit_button(label="Execute Query")
 
-if submitted:
-    if st.session_state.rag_chain is None:
-        st.warning("Please index a document prior to submitting queries.")
-    elif not user_question.strip():
-        st.warning("Enter a prompt to analyze.")
+if submit_query and query_text:
+    if not st.session_state.rag_chain:
+        st.error("Please run the ingestion pipeline or upload a file first.")
     else:
-        with st.spinner("Generating response..."):
-            result = query_rag_chain(st.session_state.rag_chain, user_question)
-        st.session_state.last_result = {
-            "question": user_question,
-            "answer": result.get("answer", ""),
-            "sources": result.get("context", []),
-        }
-        st.session_state.query_history.append(user_question)
+        with st.spinner("Running vector similarity retrieval..."):
+            try:
+                res = query_rag_chain(st.session_state.rag_chain, query_text)
+                st.session_state.last_result = {
+                    "answer": res.get("answer", "No answer compiled."),
+                    "sources": res.get("context", [])
+                }
+            except Exception as e:
+                st.error(f"Execution failed: {str(e)}")
 
-# --------------------------------------------------------------------------
-# Output & Context Citations
-# --------------------------------------------------------------------------
+# Display Grounded Answer Screen
 if st.session_state.last_result:
-    result = st.session_state.last_result
-
-    st.markdown('<div class="section-label">Generated Response</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="answer-box">{result["answer"]}</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="section-label">Retrieved Evidence</div>', unsafe_allow_html=True)
-
-    if not result["sources"]:
-        st.markdown(
-            '<div class="source-box">No matching context fragments were retrieved.</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        for i, doc in enumerate(result["sources"], start=1):
-            page = doc.metadata.get("page", "N/A")
-            snippet = doc.page_content.strip().replace("\n", " ")
+    result_data = st.session_state.last_result
+    st.markdown("### Grounded Analysis Output")
+    st.markdown(f'<div class="answer-card">{result_data["answer"]}</div>', unsafe_allow_html=True)
+    
+    if result_data["sources"]:
+        st.markdown('<div class="section-heading">Retrieved Source Footnotes</div>', unsafe_allow_html=True)
+        for idx, doc in enumerate(result_data["sources"]):
+            page_num = doc.metadata.get("page", "N/A")
             st.markdown(
                 f"""
-                <div class="source-box">
-                    <span class="source-meta">Document Snippet {i} • Page {page}</span>
-                    {snippet}
+                <div class="source-card">
+                    <div class="source-tag">Source Chunk [{idx + 1}] — Page {page_num}</div>
+                    <div>{doc.page_content}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
