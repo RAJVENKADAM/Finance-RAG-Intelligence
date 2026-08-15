@@ -31,9 +31,9 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
 # --------------------------------------------------------------------------
-# Embeddings (Cloud-based, zero local footprint)
+# Embeddings (Cloud API Inference - Zero local RAM or CPU download footprint)
 # --------------------------------------------------------------------------
-EMBEDDING_MODEL_NAME = "bge-large-en-v1.5"
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 # --------------------------------------------------------------------------
 # LLM (Groq)
