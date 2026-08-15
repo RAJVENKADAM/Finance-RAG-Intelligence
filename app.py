@@ -18,10 +18,16 @@ from ingestion import ingest_pdf, load_existing_vectorstore, IngestionStats
 from rag_pipeline import build_rag_chain, query_rag_chain
 from kpi_extractor import extract_kpis
 
-logging.basicConfig(level=logging.INFO)
+import logging
+import time
+from pathlib import Path
 
+import streamlit as st
+
+# MUST BE THE FIRST STREAMLIT COMMAND:
 st.set_page_config(
-    page_title="Finance RAG Intelligence",
+    page_title="Finance RAG | Intelligence Dashboard",
+    page_icon="https://api.iconify.design/lucide:cat.svg",  # SVG link from below
     layout="wide",
     initial_sidebar_state="expanded",
 )
