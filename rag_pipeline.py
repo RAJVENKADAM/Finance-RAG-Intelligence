@@ -2,8 +2,7 @@
 rag_pipeline.py
 ----------------
 RAG orchestration layer: wires the Chroma retriever, the Groq LLM,
-and an enterprise-grade QA prompt together via LangChain's
-`create_retrieval_chain` / `create_stuff_documents_chain` (v0.3+ API).
+and an enterprise-grade QA prompt together via LangChain Classic.
 """
 
 import logging
@@ -25,11 +24,6 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
-# --------------------------------------------------------------------------
-# Enterprise QA prompt
-# --------------------------------------------------------------------------
-# Grounded, citation-aware, and explicit about refusing to hallucinate
-# when the retrieved context does not contain the answer.
 QA_SYSTEM_PROMPT = """You are a senior financial analyst assistant embedded in an
 enterprise document intelligence platform. Answer the user's question using ONLY
 the information provided in the context below, which was retrieved from an
@@ -55,10 +49,7 @@ QA_PROMPT = ChatPromptTemplate.from_messages(
 
 
 def get_llm() -> ChatGroq:
-    """
-    Instantiate the Groq-hosted chat model.
-    The API key is pulled securely from the environment (never hardcoded).
-    """
+    """Instantiate the Groq-hosted chat model."""
     return ChatGroq(
         api_key=GROQ_API_KEY,
         model=GROQ_MODEL_NAME,
@@ -68,27 +59,14 @@ def get_llm() -> ChatGroq:
 
 
 def build_rag_chain(vectorstore: Chroma) -> Runnable:
-    """
-    Assemble the full retrieval-augmented generation chain.
-
-    Args:
-        vectorstore: A populated Chroma vector store.
-
-    Returns:
-        A runnable chain that accepts {"input": <question>} and returns
-        {"answer": ..., "context": [Document, ...]}.
-    """
+    """Assemble the full retrieval-augmented generation chain."""
     retriever = vectorstore.as_retriever(
         search_type="similarity",
         search_kwargs={"k": RETRIEVER_TOP_K},
     )
 
     llm = get_llm()
-
-    # Combines retrieved documents into a single prompt ("stuffing" strategy).
     document_chain = create_stuff_documents_chain(llm=llm, prompt=QA_PROMPT)
-
-    # Wires retriever -> document_chain into one retrieval chain.
     retrieval_chain = create_retrieval_chain(
         retriever=retriever,
         combine_docs_chain=document_chain,
@@ -99,15 +77,6 @@ def build_rag_chain(vectorstore: Chroma) -> Runnable:
 
 
 def query_rag_chain(chain: Runnable, question: str) -> dict:
-    """
-    Execute a single query against the RAG chain.
-
-    Args:
-        chain: The runnable built by `build_rag_chain`.
-        question: Natural-language question from the user.
-
-    Returns:
-        Dict with keys "answer" (str) and "context" (List[Document]).
-    """
+    """Execute a single query against the RAG chain."""
     result = chain.invoke({"input": question})
     return result
