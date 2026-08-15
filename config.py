@@ -1,7 +1,7 @@
 """
 config.py
 ---------
-Centralized configuration for the Finance RAG application.
+Centralised configuration for the Finance RAG application.
 All tunables live here so the rest of the codebase never hardcodes
 paths, model names, or chunking parameters.
 """
@@ -31,9 +31,9 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
 # --------------------------------------------------------------------------
-# Embeddings (local, free, no API key required)
+# Embeddings (Cloud-based, zero local footprint)
 # --------------------------------------------------------------------------
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL_NAME = "bge-large-en-v1.5"
 
 # --------------------------------------------------------------------------
 # LLM (Groq)
